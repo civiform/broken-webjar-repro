@@ -1,35 +1,33 @@
-# Play Hello World Web Tutorial for Java
+# Java compilation error repro based on Play hello world sample
 
-To follow the steps in this tutorial, you will need the correct version of Java and a build tool. You can build Play projects with any Java build tool. Since sbt takes advantage of Play features such as auto-reload, the tutorial describes how to build the project with sbt. 
+This repo is forked from [play java hello world](https://github.com/playframework/play-samples/tree/2.8.x/play-java-hello-world-tutorial) to reproduce a compilation error when using webjars.
 
-Prerequisites include:
+## Reproduction steps
 
-* Java Software Developer's Kit (SE) 1.8 or higher
-* sbt 0.13.15 or higher (we recommend 1.2.3) Note: if you downloaded this project as a zip file from https://developer.lightbend.com, the file includes an sbt distribution for your convenience.
+1. make sure you are using OpenJDK 11.0.14.x
+2. clone this repo
+3. run `sbt` then `compile`
 
-To check your Java version, enter the following in a command window:
+or if you don't have sbt installed locally you can run it in docker:
 
-`java -version`
+1. `docker build -f Dockerfile -t broken-webjar-repro .`
+2. `docker run -it --rm broken-webjar-repro:latest /bin/bash` then `sbt` and `compile`.
 
-To check your sbt version, enter the following in a command window:
+## Bug details
 
-`sbt sbtVersion`
+The bug occurs for OpenJDK 11.0.14.x but not 11.0.10.x
 
-If you do not have the required versions, follow these links to obtain them:
+The bug appears when including the `"org.webjars.npm" % "azure__storage-blob" % "10.5.0"` library dependency. Including other webjars, including other webjars from azure, do not cause a compilation error.
 
-* [Java SE](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
-* [sbt](http://www.scala-sbt.org/download.html)
+When `azure__storage-blob` is included, Java presents a compilation error message `ZIP file can't be opened as a file system because an entry has a '.' or '..' element in its name` for every package name component in the project. E.g.
 
-## Build and run the project
+```
+[error] /home/bionj/dev/civiform/universal-application-tool-0.0.1/app/auth/AccountNonexistentException.java:1:1: cannot access auth
+[error]   ZIP file can't be opened as a file system because an entry has a '.' or '..' element in its name
+[error] /home/bionj/dev/civiform/universal-application-tool-0.0.1/app/auth/oidc/AdOidcProvider.java:1:1: cannot access auth.oidc
+[error]   ZIP file can't be opened as a file system because an entry has a '.' or '..' element in its name
+[error] /home/bionj/dev/civiform/universal-application-tool-0.0.1/app/auth/saml/InvalidSamlProfileException.java:1:1: cannot access auth.saml
+[error]   ZIP file can't be opened as a file system because an entry has a '.' or '..' element in its name
+```
 
-This example Play project was created from a seed template. It includes all Play components and an Akka HTTP server. The project is also configured with filters for Cross-Site Request Forgery (CSRF) protection and security headers.
-
-To build and run the project:
-
-1. Use a command window to change into the example project directory, for example: `cd play-java-hello-world-web`
-
-2. Build the project. Enter: `sbt run`. The project builds and starts the embedded HTTP server. Since this downloads libraries and dependencies, the amount of time required depends partly on your connection's speed.
-
-3. After the message `Server started, ...` displays, enter the following URL in a browser: <http://localhost:9000>
-
-The Play application responds: `Welcome to the Hello World Tutorial!`
+The error message looks like it is coming from a bugfix [introduced to OpenJDK here](https://bugs.openjdk.java.net/browse/JDK-8274727).
